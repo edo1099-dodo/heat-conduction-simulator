@@ -1,8 +1,3 @@
-"""
-Main.py
-Main GUI window and simulation engine for two-body heat conduction.
-"""
-
 import os
 import sys
 
@@ -27,8 +22,8 @@ from AboutWindow import AboutWindow
 from Body import Body
 from GraphWindow import GraphWindow
 
-# Material presets: display name -> specific heat capacity in J/(kg*°C)
-# "Custom" keeps the default assignment value (0.40) for rapid demonstration.
+# Material presets: specific heat capacity in J/(kg*°C)
+# Custom keeps 0.40 as default for fast demonstration
 MATERIAL_PRESETS = {
     "Custom": None,
     "Lead (128)": 128.0,
@@ -41,11 +36,11 @@ MATERIAL_PRESETS = {
 
 MIN_TEMP = 0.0
 MAX_TEMP = 200.0
-SIMULATION_DT = 0.05  # seconds per simulation step (50 ms timer -> 20 FPS)
-EQUILIBRIUM_TOLERANCE = 0.25  # °C difference for auto-stop
+SIMULATION_DT = 0.05  # seconds per timer tick (50 ms)
+EQUILIBRIUM_TOLERANCE = 0.25  # °C
 
 
-def load_shared_stylesheet(widget: QWidget) -> None:
+def load_stylesheet(widget):
     css_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.css")
     if os.path.exists(css_path):
         with open(css_path, "r", encoding="utf-8") as css_file:
@@ -60,13 +55,13 @@ class HeatTransfer(QWidget):
         self.graph_window = None
         self.about_window = None
 
-        # Physics & simulation state
+        # Simulation state
         self.body1 = None
         self.body2 = None
         self.dt = SIMULATION_DT
         self.elapsed_time = 0.0
 
-        # Experiment history lists (shared with GraphWindow)
+        # Data lists for graphing and CSV export
         self.time_history = []
         self.body1_temp_history = []
         self.body2_temp_history = []
@@ -77,9 +72,8 @@ class HeatTransfer(QWidget):
         self.simulation_timer.timeout.connect(self.timer_method)
 
         self.setupUI()
-        load_shared_stylesheet(self)
+        load_stylesheet(self)
 
-        # Initialize visual body colors and flow indicator from initial slider values
         self.left_temperature_changed()
         self.right_temperature_changed()
 
@@ -91,7 +85,7 @@ class HeatTransfer(QWidget):
         root_layout.setContentsMargins(18, 16, 18, 16)
         root_layout.setSpacing(14)
 
-        # Header
+        # Header bar
         header_layout = QHBoxLayout()
         title_label = QLabel("Heat Conduction Between Two Bodies")
         title_label.setObjectName("titleLabel")
@@ -102,13 +96,13 @@ class HeatTransfer(QWidget):
         header_layout.addWidget(self.elapsed_time_label)
         root_layout.addLayout(header_layout)
 
-        # Main 3-column layout: Left Body | Center Bridge & Controls | Right Body
+        # Main 3-column layout
         columns_layout = QHBoxLayout()
         columns_layout.setSpacing(16)
 
-        left_card = self._build_left_body_panel()
-        center_card = self._build_center_panel()
-        right_card = self._build_right_body_panel()
+        left_card = self.build_left_body_panel()
+        center_card = self.build_center_panel()
+        right_card = self.build_right_body_panel()
 
         columns_layout.addWidget(left_card, stretch=5)
         columns_layout.addWidget(center_card, stretch=4)
@@ -116,12 +110,11 @@ class HeatTransfer(QWidget):
 
         root_layout.addLayout(columns_layout, stretch=1)
 
-        # Bottom status line
         self.status_label = QLabel("Adjust temperatures using the sliders, then press Start.")
         self.status_label.setObjectName("statusLabel")
         root_layout.addWidget(self.status_label)
 
-    def _build_left_body_panel(self) -> QFrame:
+    def build_left_body_panel(self):
         card = QFrame()
         card.setObjectName("cardFrame")
         layout = QVBoxLayout(card)
@@ -133,7 +126,6 @@ class HeatTransfer(QWidget):
         heading.setAlignment(Qt.AlignCenter)
         layout.addWidget(heading)
 
-        # Slider + Colored Body block
         visual_layout = QHBoxLayout()
         visual_layout.setSpacing(12)
 
@@ -150,12 +142,11 @@ class HeatTransfer(QWidget):
         visual_layout.addWidget(self.left_body_box, stretch=1)
         layout.addLayout(visual_layout)
 
-        # Parameter grid
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(8)
 
-        # Temperature (read-only display; modified only via slider)
+        # Read-only temperature display (changed only with the slider)
         self.left_temp_display = QDoubleSpinBox()
         self.left_temp_display.setRange(-1000.0, 10000.0)
         self.left_temp_display.setDecimals(1)
@@ -177,11 +168,11 @@ class HeatTransfer(QWidget):
         self.left_heat_cap_spinbox.setSingleStep(0.10)
         self.left_heat_cap_spinbox.setSuffix(" J/kg°C")
         self.left_heat_cap_spinbox.setValue(0.40)
-        self.left_heat_cap_spinbox.valueChanged.connect(self._on_left_heat_cap_manual_edit)
+        self.left_heat_cap_spinbox.valueChanged.connect(self.on_left_heat_cap_edited)
 
         self.left_material_combo = QComboBox()
         self.left_material_combo.addItems(MATERIAL_PRESETS.keys())
-        self.left_material_combo.currentTextChanged.connect(self._apply_left_material_preset)
+        self.left_material_combo.currentTextChanged.connect(self.apply_left_material)
 
         self.left_heater_spinbox = QDoubleSpinBox()
         self.left_heater_spinbox.setRange(0.0, 500.0)
@@ -204,7 +195,7 @@ class HeatTransfer(QWidget):
         layout.addLayout(grid)
         return card
 
-    def _build_right_body_panel(self) -> QFrame:
+    def build_right_body_panel(self):
         card = QFrame()
         card.setObjectName("cardFrame")
         layout = QVBoxLayout(card)
@@ -216,7 +207,6 @@ class HeatTransfer(QWidget):
         heading.setAlignment(Qt.AlignCenter)
         layout.addWidget(heading)
 
-        # Colored Body block + Slider on the right
         visual_layout = QHBoxLayout()
         visual_layout.setSpacing(12)
 
@@ -233,7 +223,6 @@ class HeatTransfer(QWidget):
         visual_layout.addWidget(self.right_temp_slider)
         layout.addLayout(visual_layout)
 
-        # Parameter grid
         grid = QGridLayout()
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(8)
@@ -259,11 +248,11 @@ class HeatTransfer(QWidget):
         self.right_heat_cap_spinbox.setSingleStep(0.10)
         self.right_heat_cap_spinbox.setSuffix(" J/kg°C")
         self.right_heat_cap_spinbox.setValue(0.40)
-        self.right_heat_cap_spinbox.valueChanged.connect(self._on_right_heat_cap_manual_edit)
+        self.right_heat_cap_spinbox.valueChanged.connect(self.on_right_heat_cap_edited)
 
         self.right_material_combo = QComboBox()
         self.right_material_combo.addItems(MATERIAL_PRESETS.keys())
-        self.right_material_combo.currentTextChanged.connect(self._apply_right_material_preset)
+        self.right_material_combo.currentTextChanged.connect(self.apply_right_material)
 
         self.right_heater_spinbox = QDoubleSpinBox()
         self.right_heater_spinbox.setRange(0.0, 500.0)
@@ -286,7 +275,7 @@ class HeatTransfer(QWidget):
         layout.addLayout(grid)
         return card
 
-    def _build_center_panel(self) -> QFrame:
+    def build_center_panel(self):
         card = QFrame()
         card.setObjectName("cardFrame")
         layout = QVBoxLayout(card)
@@ -304,7 +293,6 @@ class HeatTransfer(QWidget):
         self.conductivity_spinbox.setSuffix(" J/s°C")
         self.conductivity_spinbox.setValue(1.00)
 
-        # Visual conductive bridge connecting the two bodies
         bridge_bar = QFrame()
         bridge_bar.setObjectName("bridgeBar")
         bridge_bar.setFixedHeight(22)
@@ -316,7 +304,7 @@ class HeatTransfer(QWidget):
         self.auto_stop_checkbox = QCheckBox("Auto-stop at equilibrium")
         self.auto_stop_checkbox.setChecked(True)
 
-        # Start / Stop toggle button
+        # Toggle button for Start / Stop
         self.start_stop_button = QPushButton("Start")
         self.start_stop_button.setObjectName("startStopButton")
         self.start_stop_button.setCheckable(True)
@@ -341,22 +329,20 @@ class HeatTransfer(QWidget):
 
         return card
 
-    # --- Visual helpers ---
-
-    @staticmethod
-    def _temperature_to_red_channel(temperature: float) -> int:
+    # Map temperature [0, 200] across the full red channel [0, 255]
+    def temp_to_red(self, temperature):
         clamped = max(MIN_TEMP, min(MAX_TEMP, temperature))
         return int(round((clamped / MAX_TEMP) * 255))
 
-    def _update_body_color(self, body_box: QFrame, temperature: float):
-        red = self._temperature_to_red_channel(temperature)
+    def update_body_color(self, body_box, temperature):
+        red = self.temp_to_red(temperature)
         body_box.setStyleSheet(
             f"background-color: rgb({red}, 0, 0);"
             "border: 2px solid #1e293b;"
             "border-radius: 8px;"
         )
 
-    def _update_heat_flow_indicator(self):
+    def update_heat_flow_indicator(self):
         t1 = self.left_temp_display.value()
         t2 = self.right_temp_display.value()
         diff = t1 - t2
@@ -367,7 +353,7 @@ class HeatTransfer(QWidget):
         else:
             self.heat_flow_label.setText(f"Heat Flow: ◀──  ({abs(diff):.1f} °C)")
 
-    def _set_inputs_enabled(self, enabled: bool):
+    def set_inputs_enabled(self, enabled):
         self.left_temp_slider.setEnabled(enabled)
         self.right_temp_slider.setEnabled(enabled)
         self.left_mass_spinbox.setEnabled(enabled)
@@ -377,65 +363,61 @@ class HeatTransfer(QWidget):
         self.left_material_combo.setEnabled(enabled)
         self.right_material_combo.setEnabled(enabled)
 
-    # --- Material preset callbacks ---
-
-    def _apply_left_material_preset(self, material_name: str):
+    def apply_left_material(self, material_name):
         preset_value = MATERIAL_PRESETS.get(material_name)
         if preset_value is not None:
             self.left_heat_cap_spinbox.blockSignals(True)
             self.left_heat_cap_spinbox.setValue(preset_value)
             self.left_heat_cap_spinbox.blockSignals(False)
 
-    def _apply_right_material_preset(self, material_name: str):
+    def apply_right_material(self, material_name):
         preset_value = MATERIAL_PRESETS.get(material_name)
         if preset_value is not None:
             self.right_heat_cap_spinbox.blockSignals(True)
             self.right_heat_cap_spinbox.setValue(preset_value)
             self.right_heat_cap_spinbox.blockSignals(False)
 
-    def _on_left_heat_cap_manual_edit(self):
+    def on_left_heat_cap_edited(self):
         if self.left_material_combo.currentText() != "Custom":
             self.left_material_combo.blockSignals(True)
             self.left_material_combo.setCurrentText("Custom")
             self.left_material_combo.blockSignals(False)
 
-    def _on_right_heat_cap_manual_edit(self):
+    def on_right_heat_cap_edited(self):
         if self.right_material_combo.currentText() != "Custom":
             self.right_material_combo.blockSignals(True)
             self.right_material_combo.setCurrentText("Custom")
             self.right_material_combo.blockSignals(False)
 
-    # --- Core simulation callbacks ---
-
     def left_temperature_changed(self):
         temp = float(self.left_temp_slider.value())
         self.left_temp_display.setValue(temp)
-        self._update_body_color(self.left_body_box, temp)
-        self._update_heat_flow_indicator()
+        self.update_body_color(self.left_body_box, temp)
+        self.update_heat_flow_indicator()
 
     def right_temperature_changed(self):
         temp = float(self.right_temp_slider.value())
         self.right_temp_display.setValue(temp)
-        self._update_body_color(self.right_body_box, temp)
-        self._update_heat_flow_indicator()
+        self.update_body_color(self.right_body_box, temp)
+        self.update_heat_flow_indicator()
 
-    def start_stop_button_method(self, checked: bool):
+    def start_stop_button_method(self, checked):
         if checked:
-            # Start a new experiment: initialize fresh bodies and reset history lists
             t1 = self.left_temp_display.value()
             t2 = self.right_temp_display.value()
 
             self.body1 = Body(
-                mass=self.left_mass_spinbox.value(),
-                heat_capacity=self.left_heat_cap_spinbox.value(),
-                temperature=t1,
+                self.left_mass_spinbox.value(),
+                self.left_heat_cap_spinbox.value(),
+                t1,
             )
             self.body2 = Body(
-                mass=self.right_mass_spinbox.value(),
-                heat_capacity=self.right_heat_cap_spinbox.value(),
-                temperature=t2,
+                self.right_mass_spinbox.value(),
+                self.right_heat_cap_spinbox.value(),
+                t2,
             )
 
+            # Reset history lists for the new experiment
             self.elapsed_time = 0.0
             self.time_history = [0.0]
             self.body1_temp_history = [self.body1.temperature]
@@ -443,23 +425,22 @@ class HeatTransfer(QWidget):
             self.elapsed_time_label.setText("Time: 0.00 s")
 
             self.start_stop_button.setText("Stop")
-            self._set_inputs_enabled(False)
+            self.set_inputs_enabled(False)
             self.status_label.setText("Simulation running...")
             self.simulation_timer.start()
         else:
-            # Stop the simulation
             self.simulation_timer.stop()
             self.start_stop_button.setText("Start")
-            self._set_inputs_enabled(True)
+            self.set_inputs_enabled(True)
             if not self.status_label.text().startswith("Equilibrium reached"):
                 self.status_label.setText("Simulation stopped.")
 
     def timer_method(self):
-        # 1. Physics equations for heat conduction + optional heaters
         t1 = self.body1.temperature
         t2 = self.body2.temperature
         sigma = self.conductivity_spinbox.value()
 
+        # Heat transfer equations
         i1 = sigma * (t2 - t1)
         i2 = sigma * (t1 - t2)
 
@@ -469,17 +450,16 @@ class HeatTransfer(QWidget):
         delta_q1 = (i1 + heater1_watts) * self.dt
         delta_q2 = (i2 + heater2_watts) * self.dt
 
-        # 2. Update body temperatures via Body.add_heat
         new_t1 = self.body1.add_heat(delta_q1)
         new_t2 = self.body2.add_heat(delta_q2)
 
-        # 3. Record experiment history
+        # Save values for graphing
         self.elapsed_time += self.dt
         self.time_history.append(self.elapsed_time)
         self.body1_temp_history.append(new_t1)
         self.body2_temp_history.append(new_t2)
 
-        # 4. Update UI displays, sliders, and colors
+        # Update UI values, sliders, and colors
         self.elapsed_time_label.setText(f"Time: {self.elapsed_time:.2f} s")
 
         self.left_temp_display.setValue(new_t1)
@@ -493,23 +473,22 @@ class HeatTransfer(QWidget):
         self.right_temp_slider.setValue(int(round(max(MIN_TEMP, min(MAX_TEMP, new_t2)))))
         self.right_temp_slider.blockSignals(False)
 
-        self._update_body_color(self.left_body_box, new_t1)
-        self._update_body_color(self.right_body_box, new_t2)
-        self._update_heat_flow_indicator()
+        self.update_body_color(self.left_body_box, new_t1)
+        self.update_body_color(self.right_body_box, new_t2)
+        self.update_heat_flow_indicator()
 
-        # 5. Bonus: Auto-stop when thermal equilibrium is reached (with heaters off)
+        # Auto-stop at equilibrium when heaters are off
         if (
             self.auto_stop_checkbox.isChecked()
             and heater1_watts == 0.0
             and heater2_watts == 0.0
             and abs(new_t1 - new_t2) <= EQUILIBRIUM_TOLERANCE
         ):
+            avg_temp = (new_t1 + new_t2) / 2
             self.status_label.setText(
-                f"Equilibrium reached at {((new_t1 + new_t2) / 2):.1f} °C after {self.elapsed_time:.2f} s."
+                f"Equilibrium reached at {avg_temp:.1f} °C after {self.elapsed_time:.2f} s."
             )
             self.start_stop_button.setChecked(False)
-
-    # --- Secondary windows ---
 
     def open_graph_window(self):
         if self.graph_window is None:

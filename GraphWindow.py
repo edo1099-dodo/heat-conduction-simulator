@@ -1,8 +1,3 @@
-"""
-GraphWindow.py
-Secondary window for plotting temperature vs. time graphs and exporting data to CSV.
-"""
-
 import csv
 import os
 import subprocess
@@ -23,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 
-def load_shared_stylesheet(widget: QWidget) -> None:
+def load_stylesheet(widget):
     css_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.css")
     if os.path.exists(css_path):
         with open(css_path, "r", encoding="utf-8") as css_file:
@@ -36,7 +31,7 @@ class GraphWindow(QWidget):
         self.main_window = main_window
         self.plotted_labels = set()
         self.setupUI()
-        load_shared_stylesheet(self)
+        load_stylesheet(self)
 
     def setupUI(self):
         self.setWindowTitle("Graph Window - Heat Conduction")
@@ -46,7 +41,7 @@ class GraphWindow(QWidget):
         main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(16)
 
-        # Left side: Matplotlib canvas inside a clean card
+        # Matplotlib graph area
         plot_card = QFrame()
         plot_card.setObjectName("cardFrame")
         plot_layout = QVBoxLayout(plot_card)
@@ -56,12 +51,12 @@ class GraphWindow(QWidget):
         self.figure.patch.set_facecolor("#ffffff")
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
-        self._format_axes()
+        self.format_axes()
 
         plot_layout.addWidget(self.canvas)
         main_layout.addWidget(plot_card, stretch=3)
 
-        # Right side: Controls panel
+        # Controls panel on the right
         controls_card = QFrame()
         controls_card.setObjectName("cardFrame")
         controls_layout = QVBoxLayout(controls_card)
@@ -69,7 +64,7 @@ class GraphWindow(QWidget):
         controls_layout.setSpacing(12)
         controls_layout.setAlignment(Qt.AlignTop)
 
-        select_label = QLabel("Select Curve to Plot:")
+        select_label = QLabel("Select Body:")
         select_label.setObjectName("sectionLabel")
 
         self.body_selector = QComboBox()
@@ -96,7 +91,7 @@ class GraphWindow(QWidget):
 
         main_layout.addWidget(controls_card, stretch=1)
 
-    def _format_axes(self):
+    def format_axes(self):
         self.ax.set_title("Temperature vs. Time", fontsize=12, fontweight="bold", pad=10)
         self.ax.set_xlabel("Time (s)", fontsize=10)
         self.ax.set_ylabel("Temperature (°C)", fontsize=10)
@@ -105,8 +100,8 @@ class GraphWindow(QWidget):
         self.ax.spines["right"].set_visible(False)
         self.figure.tight_layout()
 
-    def _plot_series(self, time_data, temp_data, label: str, color: str):
-        # Avoid duplicate legend labels if the same body is drawn again
+    def plot_series(self, time_data, temp_data, label, color):
+        # Avoid duplicate entries in the legend if Draw is clicked more than once
         plot_label = label if label not in self.plotted_labels else "_nolegend_"
         self.ax.plot(time_data, temp_data, label=plot_label, color=color, linewidth=2.2)
         self.plotted_labels.add(label)
@@ -119,28 +114,28 @@ class GraphWindow(QWidget):
         if not time_data:
             QMessageBox.information(
                 self,
-                "No Simulation Data",
+                "No Data",
                 "Run the simulation first to collect temperature data.",
             )
             return
 
         selection = self.body_selector.currentText()
         if selection == "Body 1":
-            self._plot_series(time_data, body1_data, "Body 1", "#dc2626")
+            self.plot_series(time_data, body1_data, "Body 1", "#dc2626")
         elif selection == "Body 2":
-            self._plot_series(time_data, body2_data, "Body 2", "#2563eb")
+            self.plot_series(time_data, body2_data, "Body 2", "#2563eb")
         else:
-            self._plot_series(time_data, body1_data, "Body 1", "#dc2626")
-            self._plot_series(time_data, body2_data, "Body 2", "#2563eb")
+            self.plot_series(time_data, body1_data, "Body 1", "#dc2626")
+            self.plot_series(time_data, body2_data, "Body 2", "#2563eb")
 
-        self._format_axes()
+        self.format_axes()
         self.ax.legend(loc="best", frameon=True)
         self.canvas.draw()
 
     def clear_graph(self):
         self.ax.clear()
         self.plotted_labels.clear()
-        self._format_axes()
+        self.format_axes()
         self.canvas.draw()
 
     def export_to_csv(self):
@@ -151,8 +146,8 @@ class GraphWindow(QWidget):
         if not time_data:
             QMessageBox.information(
                 self,
-                "No Simulation Data",
-                "There is no experiment data to export yet. Run the simulation first.",
+                "No Data",
+                "Run the simulation first before exporting to CSV.",
             )
             return
 
@@ -166,14 +161,13 @@ class GraphWindow(QWidget):
                 writer.writerow(["Time (s)", "Body 1 Temperature (°C)", "Body 2 Temperature (°C)"])
                 for t, t1, t2 in zip(time_data, body1_data, body2_data):
                     writer.writerow([f"{t:.3f}", f"{t1:.4f}", f"{t2:.4f}"])
-        except OSError as exc:
-            QMessageBox.critical(self, "Export Error", f"Failed to write CSV file:\n{exc}")
+        except OSError as err:
+            QMessageBox.critical(self, "Export Error", f"Could not save CSV file:\n{err}")
             return
 
-        self._open_file_in_default_app(csv_path)
+        self.open_csv_file(csv_path)
 
-    @staticmethod
-    def _open_file_in_default_app(file_path: str):
+    def open_csv_file(self, file_path):
         try:
             if sys.platform.startswith("win"):
                 os.startfile(file_path)
@@ -181,9 +175,9 @@ class GraphWindow(QWidget):
                 subprocess.Popen(["open", file_path])
             else:
                 subprocess.Popen(["xdg-open", file_path])
-        except Exception as exc:
+        except Exception as err:
             QMessageBox.warning(
-                None,
+                self,
                 "File Saved",
-                f"CSV saved to:\n{file_path}\n\nCould not open automatically: {exc}",
+                f"CSV saved to:\n{file_path}\n\nCould not open automatically: {err}",
             )

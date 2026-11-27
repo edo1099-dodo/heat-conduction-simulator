@@ -1,8 +1,3 @@
-"""
-AboutWindow.py
-About window with project illustration, engineering overview, and clickable GitHub link.
-"""
-
 import os
 
 from PySide6.QtCore import Qt
@@ -18,7 +13,7 @@ from PySide6.QtWidgets import (
 GITHUB_REPO_URL = "https://github.com/edo1099-dodo/heat-conduction-simulator"
 
 
-def load_shared_stylesheet(widget: QWidget) -> None:
+def load_stylesheet(widget):
     css_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.css")
     if os.path.exists(css_path):
         with open(css_path, "r", encoding="utf-8") as css_file:
@@ -29,7 +24,7 @@ class AboutWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setupUI()
-        load_shared_stylesheet(self)
+        load_stylesheet(self)
 
     def setupUI(self):
         self.setWindowTitle("About - Heat Conduction Simulator")
@@ -45,7 +40,6 @@ class AboutWindow(QWidget):
         card_layout.setSpacing(12)
         card_layout.setAlignment(Qt.AlignTop)
 
-        # Banner image
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignCenter)
         banner_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "about_banner.png")
@@ -55,7 +49,7 @@ class AboutWindow(QWidget):
             )
             image_label.setPixmap(pixmap)
         else:
-            image_label.setText("[Heat Conduction Diagram]")
+            image_label.setText("Heat Conduction Diagram")
         card_layout.addWidget(image_label)
 
         title_label = QLabel("Heat Conduction Simulator")
@@ -63,29 +57,27 @@ class AboutWindow(QWidget):
         title_label.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(title_label)
 
-        subtitle_label = QLabel("Physics on Computer — Thermal Conduction Between Two Bodies")
+        subtitle_label = QLabel("Physics on Computer - Heat Conduction Between Two Bodies")
         subtitle_label.setObjectName("sectionLabel")
         subtitle_label.setAlignment(Qt.AlignCenter)
         subtitle_label.setWordWrap(True)
         card_layout.addWidget(subtitle_label)
 
         description_label = QLabel(
-            "An interactive physics simulation modeling conductive heat transfer "
-            "between two solid bodies using discrete time-stepping:\n"
-            "• I = σ · ΔT,   ΔQ = I · Δt,   ΔT = ΔQ / (m · c)\n"
-            "• Includes real-time thermal color mapping, material presets, "
-            "external heaters (W), equilibrium auto-stop, plotting, and CSV export."
+            "Simulation of conductive heat transfer between two bodies over time:\n"
+            "- I = σ * ΔT,  ΔQ = I * Δt,  ΔT = ΔQ / (m * c)\n"
+            "- Includes live temperature color mapping, material presets, "
+            "heaters (W), auto-stop at equilibrium, graphing, and CSV export."
         )
         description_label.setWordWrap(True)
         description_label.setAlignment(Qt.AlignLeft)
         card_layout.addWidget(description_label)
 
-        author_label = QLabel("Author: Edo Goldstein  |  Mechanical Engineering")
+        author_label = QLabel("Author: Edo Goldstein | Mechanical Engineering")
         author_label.setObjectName("statusLabel")
         author_label.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(author_label)
 
-        # Clickable GitHub link
         github_label = QLabel(
             f'GitHub Repository: <a href="{GITHUB_REPO_URL}">{GITHUB_REPO_URL}</a>'
         )
